@@ -1,26 +1,43 @@
 {
-    "author": "adrai"
-  , "name": "nodeSSO"
-  , "version": "0.0.1"
-  , "private": false
-  , "repository": {
-      "type": "git"
-    , "url": "git@github.com:adrai/nodeSSO.git"
-  }
-  , "keywords": ["sso", "login", "web", "session", "cookie", "user"]
-  , "main": "./index.js"
-  , "directories": {
+  "author": "adrai",
+  "name": "nodeSSO",
+  "version": "0.0.1",
+  "private": false,
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:adrai/nodeSSO.git"
+  },
+  "keywords": [
+    "sso",
+    "login",
+    "web",
+    "session",
+    "cookie",
+    "user"
+  ],
+  "main": "./index.js",
+  "directories": {
     "lib": "./lib"
-  }
-  , "engines": {
-        "node": ">= v0.4.0"
-    }
-  , "dependencies": {
-  }
-  , "devDependencies": {
-      "express": ">=0.0.1"
-    , "everyauth": ">=0.0.1"
-  }
-  , "scripts" : { 
-    } 
+  },
+  "engines": {
+    "node": ">= v0.4.0"
+  },
+  "dependencies": {
+    "body-parser": "^1.17.2",
+    "cookie-parser": "^1.4.3",
+    "eslint": "^4.0.0",
+    "express-session": "^1.15.3",
+    "jade": "^1.11.0",
+    "nodemon": "^1.11.0",
+    "pug": "^2.0.0-rc.2"
+  },
+  "devDependencies": {
+    "eslint": "^4.0.0",
+    "eslint-config-standard": "^10.2.1",
+    "eslint-plugin-promise": "^3.5.0",
+    "eslint-plugin-standard": "^3.0.1",
+    "everyauth": ">=0.0.1",
+    "express": ">=0.0.1"
+  },
+  "scripts": {}
 }

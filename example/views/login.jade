@@ -4,16 +4,16 @@
       li.error= error
 form(action='/login', method='post')
   #login
-    label(for=everyauth.password.loginFormFieldName) Login
-    input(type='text', name=everyauth.password.loginFormFieldName, value='user')
+    label(for="login") Login
+    input(type='text', name="login", value='user')
   #password
-    label(for=everyauth.password.passwordFormFieldName) Password
-    input(type='password', name=everyauth.password.passwordFormFieldName, value='password')
+    label(for="password") Password
+    input(type='password', name="password", value='password')
   #remember
-    label(for='remember') Remember?
+    label(for='remember', value="Remember?")
     input(type="checkbox", name='remember', unchecked)
   #submit
-    input(type='submit') Login
+    input(type='submit', value="Login")
   #google
     label(for='google') Google Account?
     a(href='/auth/openid?openid_identifier=https://www.google.com/accounts/o8/id')
