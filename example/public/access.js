@@ -1,0 +1,3 @@
+function accessAuth() {
+  window.location = ""
+}

@@ -1,9 +1,3 @@
-const SsoJuggler = require('../lib/ssoJuggler');
-
-const authPath= '/auth'
-const deauthPath= '/deauth'
-const successPath= '/success'
-const validatePath= '/val'
 const everyauth = require('everyauth')
 const express = require('express')
 const bodyParser = require('body-parser')
@@ -12,14 +6,6 @@ const session = require('express-session')
 const app = express()
 const morgan = require('morgan')
 
-const ssoJuggler = new SsoJuggler({
-  authenticationPath: '/login',
-  cookieExpirationTime: 60 * 60 * 6,
-  authPath: authPath,
-  deauthPath: deauthPath,
-  successPath: successPath,
-  validatePath: validatePath
-});
 
 initEveryauth()
 initExpress()
@@ -38,10 +24,10 @@ function initEveryauth() {
     if (!user) return ['Login failed'];
     if (user.password !== password) return ['Login failed'];
 
-    ssoJuggler.saveUserIdentifier(params.req.session, user.login);
-    ssoJuggler.saveAuthSource(params.req.session, 'password');
-    ssoJuggler.saveRemember(params.req.session, params.req.params.remember !== undefined);
-    //req.session.userIdentifier = user.login;
+    params.req.session.userIdentifier = user.login
+    params.req.session.authSource = 'password'
+    params.req.session.remember = params.req.params.remember !== undefined
+    params.req.session.continueUrl = params.req.query.continueUrl
 
     return user;
   }
@@ -49,11 +35,11 @@ function initEveryauth() {
   const findOrCreateUser = (session, userMetadata) => {
     console.log('findOrCreateUser', userMetadata)
     // Don't forget to save the userIdentifier!
-    ssoJuggler.saveUserIdentifier(session, userMetadata.email);
-    ssoJuggler.saveAuthSource(session, 'openId');
+    session.userIdentifier = userMetadata.email
+    session.authSource = 'openId'
 
-    if (userMetadata.claimedIdentifier.indexOf('https://www.google.com/accounts/o8/id') === 0) {
-        ssoJuggler.saveAuthSource(session, 'google');
+    if (userMetadata.claimedIdentifier.indexOf('https://www.google.com/accounts/') === 0) {
+        session.authSource = 'google'
     }
 
     return userMetadata;
@@ -61,24 +47,23 @@ function initEveryauth() {
 
   everyauth.openid.myHostname('http://localhost:3001')
     .findOrCreateUser(findOrCreateUser)
-    .redirectPath(successPath);
+    .redirectPath('/success');
 
   everyauth.password
     .loginWith('login')
     .loginFormFieldName('login')
     .passwordFormFieldName('password')
-    .getLoginPath('/login')
     .postLoginPath('/login')
-    .loginView('../example/views/login.jade')
+    .getLoginPath('/login')
     .extractExtraRegistrationParams((req) => req)
     .authenticate(authenticate)
-    .loginSuccessRedirect(successPath) // Where to redirect to after a login
+    .loginSuccessRedirect('/success') // Where to redirect to after a login
     .getRegisterPath('/register') // Uri path to the registration page
     .postRegisterPath('/register') // The Uri path that your registration form POSTs to
     .registerView('a string of html; OR the name of the pug/etc-view-engine view')
     .validateRegistration(newUserAttributes => {})
     .registerUser(newUserAttributes => {})
-    .registerSuccessRedirect(successPath) // Where to redirect to after a successful registration
+    .registerSuccessRedirect('/success') // Where to redirect to after a successful registration
 }
 
 function initExpress() {
@@ -90,32 +75,86 @@ function initExpress() {
   app.use(session({ secret: 'htuayreve'/*, store: new RedisStore */ }))
 
   app.use(everyauth.middleware())
-  app.set('view engine', 'pug')
-
-  ssoJuggler.addRoutes(app)
-
-  const consumerToken = 'testToken';
 
   app.get('/validate', function(req, res){
     const userToken = req.param('userToken');
-    console.log(req.headers)
-    const callbackUrl = `${req.headers['x-forwarded-proto'].split(',')[0]}://${req.headers['x-forwarded-host']}` || 'http://service.localtunnel.me'
+    console.log(req.query, req.session)
+    // const callbackUrl = `${req.headers['x-forwarded-proto'].split(',')[0]}://${req.headers['x-forwarded-host']}` || 'http://service.localtunnel.me'
+    const callbackUrl = req.query.continueUrl || 'https://access.localtunnel.me/result'
 
-    res.redirect(`/val?consumerToken=${consumerToken}&userToken=${userToken}&callbackUrl=${callbackUrl}/result`)
+    console.log('Token is ', userToken)
+    if (!userToken) {
+      return res.status(401).send("No user")
+    }
+    return res.status(204).json({ token: userToken })
   });
+
+  // ---
+	function responseAuth(req, res, token) {
+		if (token) {
+			if (!req.session.remember) {
+				res.cookie('token', JSON.stringify(token), { maxAge: 10 * 60 * 1000 });
+			} else {
+				res.cookie('token', JSON.stringify(token));
+			}
+
+			let symbol = '?';
+      const callbackUrl = req.session.continueUrl // || 'http://service.localtunnel.me/validate/'
+
+			if (callbackUrl.indexOf('?') >= 0) {
+				symbol = '&';
+			}
+
+			res.redirect(`${callbackUrl}${symbol}userToken=${token.token}`)
+		} else {
+			res.clearCookie('token');
+		}
+	}
+
+	app.get('/auth', function(req, res){
+		const callbackUrl = req.param('callbackUrl');
+
+          let token = null;
+          if (req.cookies.token) {
+              token = JSON.parse(req.cookies.token);
+          }
+
+		req.session.callbackUrl = callbackUrl;
+
+		if (token) {
+			responseAuth(req, res, token);
+		} else {
+			res.json({ requireLogin: true })
+		}
+	}.bind(this));
+
+	app.get('/success', function(req, res){
+		const token = {};
+		token.token = require('crypto').createHash('md5').update(req.session.authSource + req.session.userIdentifier + Math.round((new Date().valueOf() * Math.random()))).digest('hex');
+		token.userIdentifier = req.session.userIdentifier;
+		if (req.session.authSource) {
+			token.authSource = req.session.authSource;
+		}
+
+		responseAuth(req, res, token);
+	});
+
+	app.get('/deauth', function(req, res){
+		const callbackUrl = req.param('callbackUrl');
+		res.clearCookie('token');
+		req.session.destroy();
+		res.redirect(callbackUrl);
+	});
+
+  // ---
 
   app.get('/result', function(req, res){
     const userIdentifier = req.param('userIdentifier')
-    const backConsumerToken = req.param('consumerToken')
     res.writeHead(200, { 'Content-Type': 'text/html' })
-    if (backConsumerToken == consumerToken) {
-      if (userIdentifier) {
-        res.write('This is the user: '+userIdentifier)
-      } else {
-        res.write('User not valid')
-      }
+    if (userIdentifier) {
+      res.write('This is the user: '+userIdentifier)
     } else {
-        res.write('Wrong sender')
+      res.write('User not valid')
     }
     res.end()
   });
