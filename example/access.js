@@ -10,10 +10,11 @@ const bodyParser = require('body-parser')
 const cookieParser = require('cookie-parser')
 const session = require('express-session')
 const app = express()
+const morgan = require('morgan')
 
 const ssoJuggler = new SsoJuggler({
   authenticationPath: '/login',
-  cookieExpirationTime: 20,
+  cookieExpirationTime: 60 * 60 * 6,
   authPath: authPath,
   deauthPath: deauthPath,
   successPath: successPath,
@@ -46,7 +47,7 @@ function initEveryauth() {
   }
 
   const findOrCreateUser = (session, userMetadata) => {
-
+    console.log('findOrCreateUser', userMetadata)
     // Don't forget to save the userIdentifier!
     ssoJuggler.saveUserIdentifier(session, userMetadata.email);
     ssoJuggler.saveAuthSource(session, 'openId');
@@ -66,8 +67,8 @@ function initEveryauth() {
     .loginWith('login')
     .loginFormFieldName('login')
     .passwordFormFieldName('password')
-    .getLoginPath('/login') // Uri path to the login page
-    .postLoginPath('/login') // Uri path that your login form POSTs to
+    .getLoginPath('/login')
+    .postLoginPath('/login')
     .loginView('../example/views/login.jade')
     .extractExtraRegistrationParams((req) => req)
     .authenticate(authenticate)
@@ -77,53 +78,47 @@ function initEveryauth() {
     .registerView('a string of html; OR the name of the pug/etc-view-engine view')
     .validateRegistration(newUserAttributes => {})
     .registerUser(newUserAttributes => {})
-    .registerSuccessRedirect(successPath); // Where to redirect to after a successful registration
+    .registerSuccessRedirect(successPath) // Where to redirect to after a successful registration
 }
 
 function initExpress() {
-  app.use(bodyParser.json())
+  app.use(morgan('combined'))
   app.use(bodyParser.urlencoded({ extended: false }))
+  app.use(bodyParser.json())
   app.use(express.static(__dirname + '/public'))
   app.use(cookieParser())
   app.use(session({ secret: 'htuayreve'/*, store: new RedisStore */ }))
+
   app.use(everyauth.middleware())
   app.set('view engine', 'pug')
 
-  ssoJuggler.addRoutes(app);
+  ssoJuggler.addRoutes(app)
 
   const consumerToken = 'testToken';
 
-  app.get('/', function(req, res){
-    res.writeHead(200, { 'Content-Type': 'text/html' });
-    res.write('Login <a href="'+authPath+'?consumerToken='+consumerToken+'&callbackUrl=http://localhost:3001/validate/">'+authPath+'?consumerToken='+consumerToken+'&callbackUrl=http://localhost:3001/validate</a>');
-    res.write('</br>');
-    res.write('</br>');
-    res.write('Logout <a href="'+deauthPath+'?callbackUrl=http://www.google.ch">'+deauthPath+'?callbackUrl=http://www.google.ch</a>');
-    res.end();
-  });
-
   app.get('/validate', function(req, res){
     const userToken = req.param('userToken');
-    res.redirect('/val?consumerToken=' + consumerToken + '&userToken=' + userToken + '&callbackUrl=http://localhost:3001/result');
+    console.log(req.headers)
+    const callbackUrl = `${req.headers['x-forwarded-proto'].split(',')[0]}://${req.headers['x-forwarded-host']}` || 'http://service.localtunnel.me'
+
+    res.redirect(`/val?consumerToken=${consumerToken}&userToken=${userToken}&callbackUrl=${callbackUrl}/result`)
   });
 
   app.get('/result', function(req, res){
-    const userIdentifier = req.param('userIdentifier');
-    const backConsumerToken = req.param('consumerToken');
-    res.writeHead(200, { 'Content-Type': 'text/html' });
+    const userIdentifier = req.param('userIdentifier')
+    const backConsumerToken = req.param('consumerToken')
+    res.writeHead(200, { 'Content-Type': 'text/html' })
     if (backConsumerToken == consumerToken) {
       if (userIdentifier) {
-        res.write('This is the user: '+userIdentifier);
+        res.write('This is the user: '+userIdentifier)
       } else {
-        res.write('User not valid');
+        res.write('User not valid')
       }
     } else {
-        res.write('Wrong sender');
+        res.write('Wrong sender')
     }
-    res.end();
+    res.end()
   });
 
-  everyauth.helpExpress(app);
-
-  app.listen(3001);
+  app.listen(3001)
 }
