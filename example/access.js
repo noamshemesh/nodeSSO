@@ -90,7 +90,7 @@ function initExpress() {
   });
 
   // ---
-	function responseAuth(req, res, token) {
+	function responseAuth(req, res, token, callbackUrlParam) {
 		if (token) {
 			if (!req.session.remember) {
 				res.cookie('token', JSON.stringify(token), { maxAge: 10 * 60 * 1000 });
@@ -99,7 +99,7 @@ function initExpress() {
 			}
 
 			let symbol = '?';
-      const callbackUrl = req.session.continueUrl // || 'http://service.localtunnel.me/validate/'
+      const callbackUrl = callbackUrlParam || req.session.continueUrl // || 'http://service.localtunnel.me/validate/'
 
 			if (callbackUrl.indexOf('?') >= 0) {
 				symbol = '&';
@@ -119,12 +119,10 @@ function initExpress() {
               token = JSON.parse(req.cookies.token);
           }
 
-		req.session.callbackUrl = callbackUrl;
-
 		if (token) {
-			responseAuth(req, res, token);
+			responseAuth(req, res, token, callbackUrl);
 		} else {
-			res.json({ requireLogin: true })
+			res.redirect(req.query.loginUrl)
 		}
 	}.bind(this));
 

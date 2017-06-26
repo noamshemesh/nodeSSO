@@ -41,26 +41,15 @@ module.exports = function (port, url) {
     app.set('view engine', 'pug')
 
     app.get('/auth', function (req, res) {
-      console.log(`Calling https://access.localtunnel.me${req.originalUrl}`)
-      request.get(`https://access.localtunnel.me${req.originalUrl}`, {
-        json: true,
-        resolveWithFullResponse: true,
-        followRedirect: false
-      }).then((response) => {
-        console.log('Body is ', response.body)
-        if (response.statusCode < 300 && response.body.requireLogin) {
-          console.log('redirecting to login ', response.headers)
-          return res.render('../example/views/login.jade')
-        } else if (response.statusCode < 400) {
-          console.log('response is ', response)
-        }
+      res.redirect(`https://access.localtunnel.me${req.originalUrl}${req.originalUrl.indexOf('?') >= 0 ? '&' : '?'}loginUrl=${encodeURIComponent(url + '/login')}`)
+    })
 
-        return res.send(400)
-      })
+    app.get('/deauth', function (req, res) {
+      res.redirect(`https://access.localtunnel.me${req.originalUrl}`)
     })
 
     app.get('/login', function (req, res) {
-      return res.render('../example/views/login.jade')
+      return res.render('../example/views/login.jade', { continueUrl: `${encodeURIComponent(url)}/validate` })
     })
 
     app.get('/validate', function (req, res) {
@@ -81,14 +70,14 @@ module.exports = function (port, url) {
 
     app.get('/', function(req, res) {
       res.writeHead(200, { 'Content-Type': 'text/html' })
-      res.write(`Login <a href="${authPath}?callbackUrl=${url}/validate/">${authPath}?callbackUrl=${url}/validate</a>`)
+      res.write(`Login <a href="${authPath}?callbackUrl=${url}/validate">${authPath}?callbackUrl=${url}/validate</a>`)
       res.write('</br>')
       res.write('</br>')
       res.write(`Logout <a href="${deauthPath}?callbackUrl=http://www.google.ch">${deauthPath}?callbackUrl=http://www.google.ch</a>`)
       res.end()
     });
 
-    app.all([ '/register', '/deauth' ], function (req, res) {
+    app.all([ '/register' ], function (req, res) {
       console.log('Forwarding request to access')
       apiProxy.web(req, res, {
         target: 'http://localhost:3001',
