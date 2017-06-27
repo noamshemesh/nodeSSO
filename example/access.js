@@ -5,7 +5,7 @@ const cookieParser = require('cookie-parser')
 const session = require('express-session')
 const app = express()
 const morgan = require('morgan')
-
+const cors = require('cors')
 
 initEveryauth()
 initExpress()
@@ -73,6 +73,11 @@ function initExpress() {
   app.use(express.static(__dirname + '/public'))
   app.use(cookieParser())
   app.use(session({ secret: 'htuayreve'/*, store: new RedisStore */ }))
+  app.use(cors({
+    origin: /https?:\/\/service2?\.localtunnel\.me/,
+    credentials: true,
+    methods: [ 'GET', 'POST', 'HEAD', 'OPTIONS' ]
+  }))
 
   app.use(everyauth.middleware())
 
@@ -95,7 +100,7 @@ function initExpress() {
 			if (!req.session.remember) {
 				res.cookie('token', JSON.stringify(token), { maxAge: 10 * 60 * 1000 });
 			} else {
-				res.cookie('token', JSON.stringify(token));
+				res.cookie('token', JSON.stringify(token), { maxAge: 10 * 60 * 1000 });
 			}
 
 			let symbol = '?';
@@ -105,24 +110,27 @@ function initExpress() {
 				symbol = '&';
 			}
 
-			res.redirect(`${callbackUrl}${symbol}userToken=${token.token}`)
+			return `${callbackUrl}${symbol}userToken=${token.token}`
 		} else {
 			res.clearCookie('token');
 		}
 	}
 
-	app.get('/auth', function(req, res){
-		const callbackUrl = req.param('callbackUrl');
 
-          let token = null;
-          if (req.cookies.token) {
-              token = JSON.parse(req.cookies.token);
-          }
+	app.get('/auth', function(req, res) {
+		const callbackUrl = req.query.callbackUrl
+
+    let token = null
+    if (req.cookies.token) {
+        token = JSON.parse(req.cookies.token)
+    }
 
 		if (token) {
-			responseAuth(req, res, token, callbackUrl);
+			const next = responseAuth(req, res, token, callbackUrl)
+
+      res.json({ next })
 		} else {
-			res.redirect(req.query.loginUrl)
+			res.json({ next: req.query.loginUrl })
 		}
 	}.bind(this));
 
@@ -134,7 +142,8 @@ function initExpress() {
 			token.authSource = req.session.authSource;
 		}
 
-		responseAuth(req, res, token);
+		const next = responseAuth(req, res, token)
+    next && res.redirect(next)
 	});
 
 	app.get('/deauth', function(req, res){

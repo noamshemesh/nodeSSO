@@ -69,11 +69,14 @@ module.exports = function (port, url) {
     })
 
     app.get('/', function(req, res) {
+      let queryParams = `callbackUrl=${encodeURIComponent(`${url}/validate`)}&loginUrl=${encodeURIComponent(url + '/login')}`
       res.writeHead(200, { 'Content-Type': 'text/html' })
-      res.write(`Login <a href="${authPath}?callbackUrl=${url}/validate">${authPath}?callbackUrl=${url}/validate</a>`)
-      res.write('</br>')
-      res.write('</br>')
+      res.write(`<html><head><script src="/access.js"></script><title>Hello</title></head><body>`)
+      res.write(`Login <a href="javascript:void(0);" onclick="accessAuth('${authPath}?${queryParams}')">${authPath}?${queryParams}</a>`)
+      res.write('<br />')
+      res.write('<br />')
       res.write(`Logout <a href="${deauthPath}?callbackUrl=http://www.google.ch">${deauthPath}?callbackUrl=http://www.google.ch</a>`)
+      res.write(`</body></html>`)
       res.end()
     });
 
